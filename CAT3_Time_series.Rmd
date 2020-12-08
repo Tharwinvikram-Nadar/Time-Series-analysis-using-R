@@ -1,0 +1,241 @@
+---
+title: "Time Series Analysis using R"
+author: "A.Tharwinvikram Nadar"
+date: "20/11/2020"
+output:
+  html_document:
+    df_print: paged
+instructor: Dr Amiya Ranjan Bhowmick
+---
+## \textbf{Motivation}:
+#### To study the Britania stock price data perform various time series model and it's analysis
+```{r}
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(ISLR)
+raww_data = read.csv("/home/rocky/Desktop/Vikram2019-20/dataset/Stock-Data/BRITANNIA.csv"
+                     ,header = TRUE)
+```
+#### In data we see Open close and VWAP prices of the stock.
+#### $\textbf{ To build a forecasting model for the closing price of the Britannia stock data}$
+
+```{r}
+head(raww_data,10)
+```
+
+
+```{r}
+tail(raww_data,10)
+```
+## $\textbf{Some Terminology}$
+
+#### VWAP(volume weighted average price)-In finance, volume-weighted average price is the ratio of the value traded to total volume traded over a particular time horizon. It is a measure of the average price at which a stock is traded over the trading horizon. 
+
+#### Volume - In the context of a single stock trading on a stock exchange, the volume is commonly reported as the number of shares that changed hands during a given day. The transactions are measured on stocks, bonds, options contracts, futures contracts and commodities.
+
+#### Here tsclean function is used to identify and replace outliers and missing values
+#### Here frequency is set to 260 because in a year stock market functions for 260 days
+```{r}
+clean_dataa = tsclean(raww_data$Close)
+my_time = ts(clean_dataa,start = 2000,frequency = 260)
+```
+#### Plotting the time series
+```{r}
+autoplot(my_time)+ggtitle("Britannia stock prices")+xlab("Year")+ylab("Prices")
+```
+
+#### From visual inspection we don't see trend and seasonality.We observe there is a sudden price drop around the year 2010.We will try ploting some seasonality plots to check seasonality
+```{r}
+ggseasonplot(my_time, year.labels=TRUE, year.labels.left=TRUE,continuous = TRUE) +
+  ylab("$ Prices") +
+  ggtitle("Seasonal plot:Britannia stock prices ")
+
+```
+#### Plotting Seasonal Polar plot
+```{r}
+ggseasonplot(my_time, polar=TRUE) +ylab("$ Prices") +
+  ggtitle("Polar seasonal plot: Britannia stock prices")
+```
+#### Plotting seasonal subseries plot
+```{r}
+ggsubseriesplot(my_time)+ylab("$ Prices") +
+  ggtitle("Seasonal plot:Britannia stock prices ")
+
+```
+#### Hence from the seasonal plots presence of seasonality in the series is not ensured.
+
+## Autocorrelation function: 
+##### Let x_{t} be a series s and t be a point in the series then the auto correlation function is defined as $\rho(s,t)=\frac{\gamma(s,t)}{\sqrt{\gamma(s,s)\gamma(t,t)}}$. The ACF measures the linear predictability of the series at time t, say x_{t} , using only the value of x_{s}.
+####  From ACF plot we can say that the data is highly auto corelated and there is decresing trend present in the data
+```{r}
+ggAcf(my_time,lag.max = 260)+ggtitle("ACF Plot")
+```
+
+#### PACF plot talks about the coorelation of consecutive points of the series.From the plot we see that lag 1,53 and other lag outside the dotted line are statiscally siginificant and the rest are statiscally siginifcant to 0
+```{r}
+ggPacf(my_time,lag.max = 260)+ggtitle("PACF Plot")
+```
+#### Now we will split the data.
+#### Splitting the data into train and test data
+```{r}
+train_data = head(my_time,round(length(my_time)*0.8))
+h = length(my_time)-length(train_data)
+test_data = tail(my_time,h)
+```
+## Now we will try to build basic models on our series
+#### 1) Average method
+#### 2) Naive method
+#### 3) Seasonal Naive 
+#### 4) Random walk drift
+
+## Building all the models in the series
+```{r}
+model_1 = meanf(train_data, h=h)
+model_2 = rwf(train_data, h=h)
+model_3 = rwf(train_data, drift=TRUE, h=h)
+model_4 = snaive(train_data, h=h)
+
+autoplot(train_data) +
+  autolayer(model_1,series="Mean", PI=FALSE) +
+  autolayer(model_2,series="Naïve", PI=FALSE) +
+  autolayer(model_3,series="Drift", PI=FALSE) +
+  autolayer(model_4,series="Seasonal naïve", PI=FALSE)+
+  ggtitle("Britannia stock ") +
+  xlab("Year") + ylab("Closing Price") +
+  guides(colour=guide_legend(title="Forecast"))+autolayer(test_data)
+
+```
+#### From visual inspection we see that drift seem to perform well as it captures some the test data
+#### Now we will perform residue analysis for each model to see which performs better
+## Residue analysis of model 1
+```{r}
+checkresiduals(model_1)
+```
+#### pvalue of Ljung-Box test $\leq$ 0.05 hence we reject the null hypothesis therefore there is no co-relation in the residuals therefore it is not stationary
+```{r}
+shapiro.test(model_1$residuals)
+qqnorm(model_1$residuals)
+```
+#### pvalue of Shapiro-Wilk test $\leq$ 0.05 hence we reject the null hypothesis therefore residuals not normally distributed
+
+## Residue analysis of model 2
+```{r}
+checkresiduals(model_2)
+shapiro.test(model_2$residuals)
+qqnorm(model_2$residuals)
+
+```
+#### pvalue of Ljung-Box test $\leq$ 0.05 hence we reject the null hypothesis therefore there is no co-relation in the residuals therefore it is not stationary.pvalue of Shapiro-Wilk test $\leq$ 0.05 hence we reject the null hypothesis therefore residuals not normally distributed
+
+## Residue analysis of model 3
+```{r}
+checkresiduals(model_3)
+shapiro.test(model_3$residuals)
+qqnorm(model_3$residuals)
+
+```
+#### pvalue of Ljung-Box test $\leq$ 0.05 hence we reject the null hypothesis therefore there is no co-relation in the residuals therefore it is not stationary.pvalue of Shapiro-Wilk test $\leq$ 0.05 hence we reject the null hypothesis therefore residuals not normally distributed
+
+## Residue analysis of model 4
+```{r}
+checkresiduals(model_4)
+shapiro.test(model_4$residuals)
+qqnorm(model_4$residuals)
+
+```
+#### pvalue of Ljung-Box test $\leq$ 0.05 hence we reject the null hypothesis therefore there is no co-relation in the residuals therefore it is not stationary.pvalue of Shapiro-Wilk test $\leq$ 0.05 hence we reject the null hypothesis therefore residuals not normally distributed
+
+## Stationarity of the series
+#### We will use tranformation
+```{r}
+log_data = log(my_time)
+lambda = BoxCox.lambda(my_time)
+Box_data = BoxCox(my_time,lambda = lambda)
+
+```
+
+```{r}
+autoplot(log_data)+ggtitle("Log transformation of the data") 
+autoplot(Box_data)+ggtitle("Box-Cox tranformtion of the data")
+```
+
+#### Now we will check the acf plot of tranformed data
+```{r}
+ggAcf(log_data,lag.max = 260)+ggtitle("ACF Plot of log tranformed data")
+ggAcf(Box_data,lag.max = 260)+ggtitle("ACF Plot of Box-Cox tranformed data")
+
+```
+####  Tranformed data doesn't seem to work well
+
+## Decomposing the data
+#### $\textbf{The following two structures are considered for basic decomposition models:}$
+#### Additive:  = Trend + Seasonal + Random
+#### Multiplicative:  = Trend * Seasonal * Random
+
+#### $\textbf{How to Choose Between Additive and Multiplicative Decompositions}$
+#### The additive model is useful when the seasonal variation is relatively constant over time.
+#### The multiplicative model is useful when the seasonal variation increases over time.
+
+```{r}
+decomp_data = decompose(my_time,type = "multiplicative")
+autoplot(decomp_data)
+deseasonal_data = my_time/decomp_data$seasonal
+autoplot(deseasonal_data)
+```
+
+## Differencing ideas
+#### lets try for differincing methods for the deseasonal data
+```{r}
+ndiffs(deseasonal_data,test = "kpss")
+# using kpss test to find number of differencing required for the data
+first_order = diff(deseasonal_data,1)
+```
+####  Now we will look onto the acf plots of diffrenced data
+```{r}
+ggAcf(first_order,lag.max = 100)+ggtitle("ACF Plot of first order difference of deseasonal data")
+ggPacf(first_order,lag.max = 100)+ggtitle("PACF Plot of first order difference of deseasonal data")
+
+```
+####  We observe significant difference but still we are not sure whether the series is stationry or not.
+####  We will use ADF test to determine whether our diffrenced series is statinary or not
+
+```{r}
+adf.test(first_order,alternative = "stationary")
+
+```
+#### p value is less than 0.05 hence hence series is stationary
+## ARIMA model
+#### From PACF plot of first order we see suggestive AR(3) and AR(9) so our intial models will ARIMA(3,1,0) ARIMA(9,1,0) as differenced lag is 1
+```{r}
+fit_1 = Arima(deseasonal_data,order = c(3,1,0))
+fit_1
+fit_2 = Arima(deseasonal_data,order = c(9,1,0))
+fit_2
+fit_3 = Arima(deseasonal_data,order = c(3,1,1))
+fit_3
+fit_4 = Arima(deseasonal_data,order = c(9,1,1))
+fit_4
+```
+#### From the 4 models we AIC of model 4 seem to be less compared to other
+```{r}
+checkresiduals(fit_4)
+```
+
+```{r}
+qqnorm(fit_4$residuals) 
+# normality of the ARIMA(9,1,1) is not acheived
+```
+
+
+```{r}
+autoplot(forecast(fit_4)) # forecast using ARIMA(9,1,1)
+
+```
+
+
+```{r}
+fi = auto.arima(deseasonal_data,seasonal = FALSE)
+fi
+```
+
